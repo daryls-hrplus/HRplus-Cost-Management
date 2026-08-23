@@ -1,0 +1,5 @@
+Item Name,Category,Project,Currency,Payment Amount,Payment Frequency,Monthly Amount,Yearly Amount,Start Date,End Date,Vendor,Notes
+Azure Production Hosting,IT - Software & Cloud,V5,USD,2500,Monthly,2500,30000,2026-01-01,2026-12-31,Microsoft,Monthly payment
+Quarterly Taxes,Taxes & Statutories,V5,TTD,131250,Quarterly,43750,525000,2026-01-01,2026-12-31,,Quarterly payment normalized over three months
+Zoho Suite,IT - Software & Cloud,V5,TTD,230860,Annual,19238.3333,230860,2026-01-01,2026-12-31,Zoho,Annual payment normalized over twelve months
+New Firewall,IT - Hardware & Infrastructure,V5,TTD,47530,One-Time,3960.8333,47530,2026-01-01,2026-12-31,,One-time annual budget allocated over twelve months
