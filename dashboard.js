@@ -1319,7 +1319,6 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     if (!confirm("Clear all HRplus browser data?")) return;
     await HRplusStorage.clearAllDatasets();
     [
-      "hrplus-module-rates",
       "opcost-fx",
       "hrplus-start-month",
       "hrplus-show-actual",

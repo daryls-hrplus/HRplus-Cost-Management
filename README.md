@@ -20,4 +20,4 @@ Files without Record Type remain compatible and default to Operational with a wa
 
 Persistence is most reliable when the dashboard is opened from a stable HTTPS origin, such as GitHub Pages. The dashboard can also be opened directly from the filesystem, but browser handling of `file:` URLs differs and persistence is not guaranteed. If IndexedDB is unavailable or blocked, imports remain usable for the current session and the dashboard displays a warning that they cannot be restored after refresh.
 
-Use the independent clear controls to remove either dataset, or **Clear All Browser Data** to remove both datasets and this dashboard's saved settings. Data belonging to other applications is not touched.
+Use the independent clear controls to remove either dataset, or **Clear All Browser Data** to remove both datasets and non-pricing dashboard settings. Module pricing is intentionally preserved because it is reusable configuration. Data belonging to other applications is not touched.
