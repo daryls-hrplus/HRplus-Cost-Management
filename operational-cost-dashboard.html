@@ -1,40 +1,948 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Operational Cost Dashboard</title>
-  <style>
-    :root{--ink:#162033;--muted:#68758a;--line:#dce3ed;--panel:#fff;--bg:#f4f7fb;--blue:#2671d9;--green:#159a74;--amber:#d88416;--shadow:0 12px 34px rgba(18,42,74,.08)}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px}button,input,select{font:inherit}button{cursor:pointer}
-    .topbar{background:linear-gradient(105deg,#102642,#183d68);color:white;padding:22px 28px 20px}.top-inner{max-width:1600px;margin:auto;display:flex;gap:24px;align-items:flex-end;justify-content:space-between}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:#a8c8ec;font-weight:800}.title{font-size:25px;letter-spacing:-.025em;margin:3px 0}.subtitle{margin:0;color:#cbd9e9;font-size:13px}.rate-card{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:9px 12px}.rate-card label{font-size:12px;color:#dce8f6}.rate-card input{width:90px;background:white;color:var(--ink);border:0;border-radius:8px;padding:8px 9px;font-weight:800}.container{max-width:1600px;margin:auto;padding:20px 28px 34px}
-    .toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.btn{border:1px solid var(--line);background:white;color:var(--ink);border-radius:9px;padding:9px 13px;font-weight:750;display:inline-flex;gap:7px;align-items:center}.btn:hover{border-color:#9db2cf}.btn.primary{background:var(--blue);border-color:var(--blue);color:white}.btn.quiet{background:transparent}.file-input{display:none}.file-state{color:var(--muted);font-size:12px;margin-right:auto}.report-start{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.report-start input{border:1px solid var(--line);border-radius:8px;padding:8px;background:white;color:var(--ink)}
-    .notice{display:none;border:1px solid #f0c9c9;background:#fff4f4;color:#8c3030;border-radius:10px;padding:11px 13px;margin-bottom:14px}.notice.show{display:block}.notice strong{display:block;margin-bottom:4px}.notice ul{margin:4px 0 0;padding-left:20px}.storage-note{font-size:12px;color:var(--muted);margin:0 0 14px}
-    .cards{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:8px;margin-bottom:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:10px 11px;box-shadow:0 3px 10px rgba(18,42,74,.03)}.card-label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:800}.card-value{font-size:17px;font-weight:850;margin-top:3px}.card-note{color:var(--muted);font-size:10px;margin-top:1px}.accent-blue{border-top:2px solid var(--blue)}.accent-green{border-top:2px solid var(--green)}.accent-amber{border-top:2px solid var(--amber)}
-    .tabs{display:flex;border-bottom:1px solid var(--line);gap:4px;margin-bottom:14px}.tab{background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:11px 15px;font-weight:800}.tab.active{color:var(--blue);border-color:var(--blue)}.pane{display:none}.pane.active{display:block}.panel{background:white;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
-    .filters{padding:13px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(130px,1fr));gap:9px}.control{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:white;color:var(--ink)}.control:focus{outline:2px solid #b9d7ff;border-color:var(--blue)}.table-meta{padding:10px 14px;color:var(--muted);font-size:12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}.table-wrap{overflow:auto;max-height:590px}.data-table{border-collapse:separate;border-spacing:0;min-width:2350px;width:100%;font-size:12px}.data-table th,.data-table td{border-bottom:1px solid #e7ecf2;border-right:1px solid #edf1f5;padding:9px;text-align:right;white-space:nowrap}.data-table th{position:sticky;top:0;z-index:3;background:#f7f9fc;color:#536176;font-size:10px;text-transform:uppercase;letter-spacing:.04em}.data-table td:first-child,.data-table th:first-child{text-align:left;position:sticky;left:0;z-index:2;background:white;min-width:210px}.data-table th:first-child{z-index:5;background:#f7f9fc}.data-table td:nth-child(2),.data-table th:nth-child(2){text-align:left}.data-table tbody tr:hover td,.data-table tbody tr:hover td:first-child{background:#f7fbff}.item-name{font-weight:800;color:#20304a}.item-sub{font-size:10px;color:var(--muted);margin-top:2px}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#eef3f9;color:#46546a;font-weight:750}.money-zero{color:#b4bdca}.money-usd{color:#6d55b6}.total-cell{font-weight:850;background:#f3f8ff}.empty{padding:54px;text-align:center;color:var(--muted)}
-    .chart-tools{display:flex;gap:10px;padding:13px;border-bottom:1px solid var(--line);align-items:center;flex-wrap:wrap}.chart-tools label{color:var(--muted);font-size:12px}.chart-tools select{border:1px solid var(--line);border-radius:8px;padding:8px;background:white}.chart-area{padding:18px 18px 10px}.chart-title{font-size:17px;margin:0}.chart-note{color:var(--muted);font-size:12px;margin:3px 0 14px}.chart-frame{display:grid;grid-template-columns:72px minmax(0,1fr);height:420px;border:1px solid var(--line);background:#fff}.chart-scroll{overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth}.chart-plot{position:relative;height:100%;min-width:720px}.chart-plot canvas{display:block;width:100%;height:100%}.chart-tooltip{position:absolute;z-index:4;display:none;max-width:280px;padding:10px 12px;border:1px solid #cbd6e4;border-radius:8px;background:#fff;box-shadow:0 8px 24px rgba(18,42,74,.16);font-size:12px;line-height:1.5;pointer-events:none}.chart-tooltip strong{display:block;margin-bottom:3px}.period-controls{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 18px;color:var(--muted);font-size:12px}.period-controls button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 9px}.legend{display:flex;flex-wrap:wrap;gap:12px;padding:8px 18px 18px;color:var(--muted);font-size:12px}.legend span{display:flex;align-items:center;gap:6px}.dot{width:9px;height:9px;border-radius:3px}.breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 18px 18px}.break-card{border:1px solid var(--line);border-radius:10px;padding:11px}.break-name{color:var(--muted);font-size:11px}.break-value{font-weight:850;margin-top:4px}.pricing-summary{padding:10px 14px;margin:0;color:var(--muted);font-size:12px}.pricing-summary.complete{color:#187653;background:#effaf5}.pricing-summary.incomplete{color:#8a5b00;background:#fff8e8}.pricing-form{display:none;grid-template-columns:repeat(5,minmax(120px,1fr));gap:9px;padding:13px;border-bottom:1px solid var(--line);background:#f7f9fc}.pricing-form.open{display:grid}.pricing-form label{font-size:11px;color:var(--muted);font-weight:700}.pricing-form input,.pricing-form select{display:block;width:100%;margin-top:4px;border:1px solid var(--line);border-radius:7px;padding:8px;background:#fff}.pricing-form .form-error{grid-column:1/-1;color:#9b3030;min-height:18px}.pricing-form .form-actions{display:flex;align-items:end;gap:8px}.saved-only{color:var(--muted)}.pricing-table{min-width:0;width:100%}.pricing-table th,.pricing-table td{white-space:normal}.pricing-table input,.pricing-table select{width:100%;min-width:0;border:1px solid var(--line);border-radius:6px;padding:6px;background:#fff}.pricing-table .btn{padding:6px 8px;font-size:11px}
-    @media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:repeat(2,1fr)}.breakdown{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.top-inner{align-items:flex-start;flex-direction:column}.container,.topbar{padding-left:15px;padding-right:15px}.cards,.filters,.breakdown{grid-template-columns:1fr}.rate-card{width:100%;justify-content:space-between}.file-state{width:100%;order:3}.canvas-wrap{height:330px}}@media print{.topbar{background:#fff;color:#111;padding:12px}.subtitle,.eyebrow,.toolbar,.filters,.tabs,.chart-tools{display:none!important}.container{padding:10px}.cards{grid-template-columns:repeat(5,1fr)}.pane{display:block!important}.panel{box-shadow:none;margin-bottom:18px}.table-wrap{max-height:none;overflow:visible}.data-table{font-size:8px;min-width:0}.data-table th,.data-table td{padding:3px}.canvas-wrap{height:300px}}
-    @media print{.chart-scroll{overflow:visible}.chart-plot{min-width:0}.period-controls,.chart-tooltip{display:none!important}}
-  </style>
-</head>
-<body>
-  <header class="topbar"><div class="top-inner"><div><div class="eyebrow">Finance &amp; Operations</div><h1 class="title">Operational Cost Dashboard</h1><p class="subtitle">A consolidated 24-month view of company payment commitments</p></div><div class="rate-card"><label for="fxRate">USD conversion<br><strong>1 USD =</strong></label><input id="fxRate" type="number" min="0.0001" step="0.0001" value="6.7800" aria-label="USD to TTD conversion rate"><strong>TTD</strong><label class="report-start" for="startMonth">24-month period starts <input id="startMonth" type="month"></label></div></div></header>
-  <main class="container">
-    <section class="toolbar" aria-label="File controls"><label class="btn primary" for="costFile">Load Operational Costs</label><input class="file-input" id="costFile" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><label class="btn" for="clientFile">Load Client Revenue</label><input class="file-input" id="clientFile" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><button class="btn" id="costTemplateBtn">Download Cost Template</button><button class="btn" id="clientTemplateBtn">Download Client Template</button><button class="btn" id="clearAllBtn">Clear All Browser Data</button><span class="file-state" id="costFileState">Operational costs not loaded</span><span class="file-state" id="clientFileState">Client revenue not loaded</span></section>
-    <p class="storage-note" id="storageNote">Imported data is stored only in this browser profile. It is not uploaded or synchronized. Clearing browser/site data will remove the saved records.</p>
-    <section class="notice" id="notice" role="alert"></section>
-    <section class="cards" aria-label="Financial summary"><article class="card accent-blue"><div class="card-label">24-month operational cost</div><div class="card-value" id="total24">TTD 0</div></article><article class="card accent-green"><div class="card-label">Average monthly cost</div><div class="card-value" id="avgMonth">TTD 0</div></article><article class="card accent-green"><div class="card-label">Average actual revenue</div><div class="card-value" id="actualRevenue">TTD 0</div></article><article class="card"><div class="card-label">Average expected revenue</div><div class="card-value" id="expectedRevenue">TTD 0</div></article><article class="card accent-amber"><div class="card-label">Actual operating result</div><div class="card-value" id="actualResult">TTD 0</div><div class="card-note">Coverage ratio: <span id="coverage">0</span></div></article></section><p id="pricingWarning" class="pricing-warning"></p>
-    <nav class="tabs" aria-label="Dashboard sections"><button class="tab active" data-tab="records">Operational records</button><button class="tab" data-tab="clients">Client Revenue</button><button class="tab" data-tab="pricing">Module Pricing</button><button class="tab" data-tab="trend">Financial Trend</button></nav>
-    <section class="pane active" id="recordsPane"><div class="panel"><div class="filters"><input class="control" id="search" type="search" placeholder="Search item, vendor or notes"><select class="control" id="categoryFilter"><option value="">All categories</option></select><select class="control" id="projectFilter"><option value="">All projects</option></select><select class="control" id="currencyFilter"><option value="">All currencies</option></select></div><div class="table-meta"><span id="resultCount">0 items</span></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Item</th><th>Category / Project</th><th>Currency</th><th>Frequency</th><th>Payment</th><th>Monthly TTD</th><th>24-month values</th></tr></thead><tbody id="tableBody"></tbody></table></div></div></section>
-    <section class="pane" id="clientsPane"><div class="panel"><div class="filters"><input class="control" id="clientSearch" type="search" placeholder="Search client name or ID"><select class="control" id="clientProject"><option value="">All projects</option></select><select class="control" id="clientModule"><option value="">All modules</option></select><select class="control" id="clientCurrency"><option value="">All currencies</option></select><select class="control" id="clientStatus"><option value="">All statuses</option></select><select class="control" id="pricingStatus"><option value="">All pricing status</option></select></div><div class="table-meta"><span>Client revenue records</span><button class="btn" id="clientExportBtn">Export client revenue</button></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Client ID</th><th>Client Name</th><th>Project</th><th>Modules</th><th>Employees</th><th>Currency</th><th>Billing</th><th>Actual TTD</th><th>Actual / Employee</th><th>Expected Rate</th><th>Expected Revenue</th><th>Variance</th><th>Pricing Status</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody id="clientTableBody"></tbody></table></div></div></section>
-    <section class="pane" id="pricingPane"><div class="panel"><div class="table-meta"><span>Target Billing Rate per Employee per Month</span><button class="btn primary" id="addRateBtn">Add module rate</button><button class="btn" id="resetPricingBtn">Reset pricing</button></div><div id="pricingSummary" class="pricing-summary" aria-live="polite"></div><p class="chart-note" id="unpricedModules">No client modules discovered.</p><form id="pricingForm" class="pricing-form" novalidate><label>Module<input id="rateModule" required></label><label>Project<select id="rateProject" required></select></label><label>Currency<select id="rateCurrency"><option>TTD</option><option>USD</option></select></label><label>Target Billing Rate<input id="rateValue" type="number" min="0" step="0.01" required></label><div class="form-actions"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="cancelRateBtn">Cancel</button></div><div id="pricingFormError" class="form-error" role="alert"></div></form><div class="table-wrap"><table class="data-table pricing-table"><thead><tr><th>Module</th><th>Project</th><th>Currency</th><th>Target rate</th><th>TTD equivalent</th><th>Status</th><th>Actions</th></tr></thead><tbody id="pricingTableBody"></tbody></table></div></div></section>
-    <section class="pane" id="trendPane"><div class="panel"><div class="chart-tools"><label for="analysisMode">Chart mode</label><select id="analysisMode"><option value="operational">Monthly Operational Cost</option><option value="cashflow">Payment Cash Flow</option></select><label for="groupBy">Stack costs by</label><select id="groupBy"><option value="project">Project</option><option value="category">Category</option><option value="currency">Source currency</option></select><label><input type="checkbox" id="actualToggle" checked> Actual Revenue</label><label><input type="checkbox" id="expectedToggle" checked> Expected Revenue</label><label><input type="checkbox" id="applyClientFilters"> Apply client filters to chart</label><label><input type="checkbox" id="showValueLabels" checked> Show value labels</label><label for="revenueDisplay">Revenue display</label><select id="revenueDisplay"><option value="lines">Lines</option><option value="areas">Lines with area</option></select><button class="btn" id="refreshChartBtn" type="button">Refresh chart</button><button class="btn" id="printBtn">Print dashboard</button></div><div class="chart-area"><h2 class="chart-title">Financial Trend</h2><p class="chart-note">Stacked bars show operational cost or payment cash flow. Green is Actual Revenue; dashed blue is Expected Revenue.</p><div class="chart-frame"><div class="chart-axis-area"><canvas id="trendYAxis" aria-hidden="true"></canvas></div><div class="chart-scroll" id="chartScroll"><div class="chart-plot"><canvas id="trendChart" aria-label="Financial trend: stacked monthly cost bars, green Actual Revenue line and dashed blue Expected Revenue line"></canvas><div id="chartTooltip" class="chart-tooltip" role="status"></div></div></div></div><div class="period-controls"><button id="previousMonths" type="button">Previous 6 months</button><span id="visiblePeriod">Showing 24-month period</span><button id="nextMonths" type="button">Next 6 months</button></div></div><div class="legend" id="legend"></div><div class="table-meta"><span>Expected operating result</span><strong id="expectedResult">TTD 0</strong><button class="btn" id="exportBtn">Export financial trend</button></div></div></section>
-  </main>
-   <script src="vendor/xlsx.full.min.js"></script>
-   <script src="browser-storage.js"></script>
-   <script src="data-import.js"></script>
-  <script src="financial-chart.js"></script>
-  <script src="dashboard.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Operational Cost Dashboard</title>
+    <style>
+      :root {
+        --ink: #162033;
+        --muted: #68758a;
+        --line: #dce3ed;
+        --panel: #fff;
+        --bg: #f4f7fb;
+        --blue: #2671d9;
+        --green: #159a74;
+        --amber: #d88416;
+        --shadow: 0 12px 34px rgba(18, 42, 74, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        font-size: 14px;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      .topbar {
+        background: linear-gradient(105deg, #102642, #183d68);
+        color: white;
+        padding: 22px 28px 20px;
+      }
+      .top-inner {
+        max-width: 1600px;
+        margin: auto;
+        display: flex;
+        gap: 24px;
+        align-items: flex-end;
+        justify-content: space-between;
+      }
+      .eyebrow {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: #a8c8ec;
+        font-weight: 800;
+      }
+      .title {
+        font-size: 25px;
+        letter-spacing: -0.025em;
+        margin: 3px 0;
+      }
+      .subtitle {
+        margin: 0;
+        color: #cbd9e9;
+        font-size: 13px;
+      }
+      .rate-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        padding: 9px 12px;
+      }
+      .rate-card label {
+        font-size: 12px;
+        color: #dce8f6;
+      }
+      .rate-card input {
+        width: 90px;
+        background: white;
+        color: var(--ink);
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 9px;
+        font-weight: 800;
+      }
+      .container {
+        max-width: 1600px;
+        margin: auto;
+        padding: 20px 28px 34px;
+      }
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .btn {
+        border: 1px solid var(--line);
+        background: white;
+        color: var(--ink);
+        border-radius: 9px;
+        padding: 9px 13px;
+        font-weight: 750;
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .btn:hover {
+        border-color: #9db2cf;
+      }
+      .btn.primary {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: white;
+      }
+      .btn.quiet {
+        background: transparent;
+      }
+      .file-input {
+        display: none;
+      }
+      .file-state {
+        color: var(--muted);
+        font-size: 12px;
+        margin-right: auto;
+      }
+      .report-start {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .report-start input {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        background: white;
+        color: var(--ink);
+      }
+      .notice {
+        display: none;
+        border: 1px solid #f0c9c9;
+        background: #fff4f4;
+        color: #8c3030;
+        border-radius: 10px;
+        padding: 11px 13px;
+        margin-bottom: 14px;
+      }
+      .notice.show {
+        display: block;
+      }
+      .notice strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .notice ul {
+        margin: 4px 0 0;
+        padding-left: 20px;
+      }
+      .storage-note {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 14px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(150px, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 11px;
+        box-shadow: 0 3px 10px rgba(18, 42, 74, 0.03);
+      }
+      .card-label {
+        color: var(--muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 800;
+      }
+      .card-value {
+        font-size: 17px;
+        font-weight: 850;
+        margin-top: 3px;
+      }
+      .card-note {
+        color: var(--muted);
+        font-size: 10px;
+        margin-top: 1px;
+      }
+      .accent-blue {
+        border-top: 2px solid var(--blue);
+      }
+      .accent-green {
+        border-top: 2px solid var(--green);
+      }
+      .accent-amber {
+        border-top: 2px solid var(--amber);
+      }
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--line);
+        gap: 4px;
+        margin-bottom: 14px;
+      }
+      .tab {
+        background: none;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        color: var(--muted);
+        padding: 11px 15px;
+        font-weight: 800;
+      }
+      .tab.active {
+        color: var(--blue);
+        border-color: var(--blue);
+      }
+      .pane {
+        display: none;
+      }
+      .pane.active {
+        display: block;
+      }
+      .panel {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .filters {
+        padding: 13px;
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        grid-template-columns: minmax(200px, 2fr) repeat(4, minmax(130px, 1fr));
+        gap: 9px;
+      }
+      .control {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 9px 10px;
+        background: white;
+        color: var(--ink);
+      }
+      .control:focus {
+        outline: 2px solid #b9d7ff;
+        border-color: var(--blue);
+      }
+      .table-meta {
+        padding: 10px 14px;
+        color: var(--muted);
+        font-size: 12px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+      }
+      .table-wrap {
+        overflow: auto;
+        max-height: 590px;
+      }
+      .data-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        min-width: 2350px;
+        width: 100%;
+        font-size: 12px;
+      }
+      .data-table th,
+      .data-table td {
+        border-bottom: 1px solid #e7ecf2;
+        border-right: 1px solid #edf1f5;
+        padding: 9px;
+        text-align: right;
+        white-space: nowrap;
+      }
+      .data-table th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: #f7f9fc;
+        color: #536176;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .data-table td:first-child,
+      .data-table th:first-child {
+        text-align: left;
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: white;
+        min-width: 210px;
+      }
+      .data-table th:first-child {
+        z-index: 5;
+        background: #f7f9fc;
+      }
+      .data-table td:nth-child(2),
+      .data-table th:nth-child(2) {
+        text-align: left;
+      }
+      .data-table tbody tr:hover td,
+      .data-table tbody tr:hover td:first-child {
+        background: #f7fbff;
+      }
+      .item-name {
+        font-weight: 800;
+        color: #20304a;
+      }
+      .item-sub {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .pill {
+        display: inline-block;
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: #eef3f9;
+        color: #46546a;
+        font-weight: 750;
+      }
+      .money-zero {
+        color: #b4bdca;
+      }
+      .money-usd {
+        color: #6d55b6;
+      }
+      .total-cell {
+        font-weight: 850;
+        background: #f3f8ff;
+      }
+      .empty {
+        padding: 54px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .chart-tools {
+        display: flex;
+        gap: 10px;
+        padding: 13px;
+        border-bottom: 1px solid var(--line);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .chart-tools label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .chart-tools select {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        background: white;
+      }
+      .toggle-button,.group-button{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 10px;font-weight:750}
+      .toggle-button[aria-pressed="false"],.group-button[aria-pressed="false"]{color:var(--muted);background:#f3f5f8;opacity:.7}
+      .toggle-button[aria-pressed="true"]{border-color:var(--green);color:var(--green);background:#effaf5}
+      .group-buttons{display:flex;gap:6px;flex-wrap:wrap;width:100%;order:4}
+      .group-button{border-left:4px solid var(--group-color);font-size:12px}
+      .group-button.utility{border-left-color:var(--blue);}
+      .visible-insights{display:flex;gap:10px;flex-wrap:wrap;padding:9px 12px;border:1px solid var(--line);background:#f7f9fc;color:var(--muted);font-size:12px;margin-bottom:12px}
+      .visible-insights strong{color:var(--ink)}
+      .chart-area {
+        padding: 18px 18px 10px;
+      }
+      .chart-title {
+        font-size: 17px;
+        margin: 0;
+      }
+      .chart-note {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 3px 0 14px;
+      }
+      .chart-frame {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        height: 420px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+      .chart-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-behavior: smooth;
+      }
+      .chart-plot {
+        position: relative;
+        height: 100%;
+        min-width: 720px;
+      }
+      .chart-plot canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .chart-tooltip {
+        position: absolute;
+        z-index: 4;
+        display: none;
+        max-width: 280px;
+        padding: 10px 12px;
+        border: 1px solid #cbd6e4;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 8px 24px rgba(18, 42, 74, 0.16);
+        font-size: 12px;
+        line-height: 1.5;
+        pointer-events: none;
+      }
+      .chart-tooltip strong {
+        display: block;
+        margin-bottom: 3px;
+      }
+      .period-controls {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 8px 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .period-controls button {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 7px;
+        padding: 6px 9px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 8px 18px 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .legend span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 3px;
+      }
+      .breakdown {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        padding: 0 18px 18px;
+      }
+      .break-card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 11px;
+      }
+      .break-name {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .break-value {
+        font-weight: 850;
+        margin-top: 4px;
+      }
+      .pricing-summary {
+        padding: 10px 14px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .pricing-summary.complete {
+        color: #187653;
+        background: #effaf5;
+      }
+      .pricing-summary.incomplete {
+        color: #8a5b00;
+        background: #fff8e8;
+      }
+      .pricing-form {
+        display: none;
+        grid-template-columns: repeat(5, minmax(120px, 1fr));
+        gap: 9px;
+        padding: 13px;
+        border-bottom: 1px solid var(--line);
+        background: #f7f9fc;
+      }
+      .pricing-form.open {
+        display: grid;
+      }
+      .pricing-form label {
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .pricing-form input,
+      .pricing-form select {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 8px;
+        background: #fff;
+      }
+      .pricing-form .form-error {
+        grid-column: 1/-1;
+        color: #9b3030;
+        min-height: 18px;
+      }
+      .pricing-form .form-actions {
+        display: flex;
+        align-items: end;
+        gap: 8px;
+      }
+      .saved-only {
+        color: var(--muted);
+      }
+      .pricing-table {
+        min-width: 0;
+        width: 100%;
+      }
+      .pricing-table th,
+      .pricing-table td {
+        white-space: normal;
+      }
+      .pricing-table input,
+      .pricing-table select {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 6px;
+        background: #fff;
+      }
+      .pricing-table .btn {
+        padding: 6px 8px;
+        font-size: 11px;
+      }
+      @media (max-width: 1050px) {
+        .cards {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .filters {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .breakdown {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 650px) {
+        .top-inner {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .container,
+        .topbar {
+          padding-left: 15px;
+          padding-right: 15px;
+        }
+        .cards,
+        .filters,
+        .breakdown {
+          grid-template-columns: 1fr;
+        }
+        .rate-card {
+          width: 100%;
+          justify-content: space-between;
+        }
+        .file-state {
+          width: 100%;
+          order: 3;
+        }
+        .canvas-wrap {
+          height: 330px;
+        }
+      }
+      @media print {
+        .topbar {
+          background: #fff;
+          color: #111;
+          padding: 12px;
+        }
+        .subtitle,
+        .eyebrow,
+        .toolbar,
+        .filters,
+        .tabs,
+        .chart-tools {
+          display: none !important;
+        }
+        .container {
+          padding: 10px;
+        }
+        .cards {
+          grid-template-columns: repeat(5, 1fr);
+        }
+        .pane {
+          display: block !important;
+        }
+        .panel {
+          box-shadow: none;
+          margin-bottom: 18px;
+        }
+        .table-wrap {
+          max-height: none;
+          overflow: visible;
+        }
+        .data-table {
+          font-size: 8px;
+          min-width: 0;
+        }
+        .data-table th,
+        .data-table td {
+          padding: 3px;
+        }
+        .canvas-wrap {
+          height: 300px;
+        }
+      }
+      @media print {
+        .chart-scroll {
+          overflow: visible;
+        }
+        .chart-plot {
+          min-width: 0;
+        }
+        .period-controls,
+        .chart-tooltip {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="top-inner">
+        <div>
+          <div class="eyebrow">Finance &amp; Operations</div>
+          <h1 class="title">Operational Cost Dashboard</h1>
+          <p class="subtitle">
+            A consolidated 12-month view of company payment commitments
+          </p>
+        </div>
+        <div class="rate-card">
+          <label for="fxRate"
+            >USD conversion<br /><strong>1 USD =</strong></label
+          ><input
+            id="fxRate"
+            type="number"
+            min="0.0001"
+            step="0.0001"
+            value="6.7800"
+            aria-label="USD to TTD conversion rate"
+          /><strong>TTD</strong
+          ><label class="report-start" for="startMonth"
+            >12-month period starts <input id="startMonth" type="month"
+          /></label>
+        </div>
+      </div>
+    </header>
+    <main class="container">
+      <section class="toolbar" aria-label="File controls">
+        <label class="btn primary" for="costFile">Load Operational Costs</label
+        ><input
+          class="file-input"
+          id="costFile"
+          type="file"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        /><label class="btn" for="clientFile">Load Client Revenue</label
+        ><input
+          class="file-input"
+          id="clientFile"
+          type="file"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        /><button class="btn" id="costTemplateBtn">
+          Download Cost Template</button
+        ><button class="btn" id="clientTemplateBtn">
+          Download Client Template</button
+        ><button class="btn" id="clearAllBtn">Clear All Browser Data</button
+        ><span class="file-state" id="costFileState"
+          >Operational costs not loaded</span
+        ><span class="file-state" id="clientFileState"
+          >Client revenue not loaded</span
+        >
+      </section>
+      <p class="storage-note" id="storageNote">
+        Imported data is stored only in this browser profile. It is not uploaded
+        or synchronized. Clearing browser/site data will remove the saved
+        records.
+      </p>
+      <section class="notice" id="notice" role="alert"></section>
+      <section class="cards" aria-label="Financial summary">
+        <article class="card accent-green">
+          <div class="card-label" id="avgMonthLabel">Average Monthly Operational Cost</div>
+          <div class="card-value" id="avgMonth">TTD 0</div>
+          <div class="card-note" id="avgMonthNote"></div>
+        </article>
+        <article class="card accent-green">
+          <div class="card-label" id="actualRevenueLabel">Average Monthly Actual Revenue</div>
+          <div class="card-value" id="actualRevenue">TTD 0</div>
+          <div class="card-note" id="actualRevenueNote"></div>
+        </article>
+        <article class="card accent-green">
+          <div class="card-label" id="actualResultLabel">Average Monthly Result</div>
+          <div class="card-value" id="actualResult">Break-even</div>
+          <div class="card-note" id="actualResultNote"></div>
+        </article>
+        <article class="card accent-blue">
+          <div class="card-label" id="expectedRevenueLabel">Pricing Target</div>
+          <div class="card-value" id="expectedRevenue">TTD 0</div>
+          <div class="card-note" id="expectedRevenueNote"></div>
+        </article>
+      </section>
+      <p id="pricingWarning" class="pricing-warning"></p>
+      <nav class="tabs" aria-label="Dashboard sections">
+        <button class="tab active" data-tab="records">
+          Operational records</button
+        ><button class="tab" data-tab="clients">Client Revenue</button
+        ><button class="tab" data-tab="pricing">Module Pricing</button
+        ><button class="tab" data-tab="trend">Financial Trend</button>
+      </nav>
+      <section class="pane active" id="recordsPane">
+        <div class="panel">
+          <div class="filters">
+            <input
+              class="control"
+              id="search"
+              type="search"
+              placeholder="Search item, vendor or notes"
+            /><select class="control" id="categoryFilter">
+              <option value="">All categories</option></select
+            ><select class="control" id="projectFilter">
+              <option value="">All projects</option></select
+            ><select class="control" id="currencyFilter">
+              <option value="">All currencies</option>
+            </select>
+          </div>
+          <div class="table-meta"><span id="resultCount">0 items</span></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Category / Project</th>
+                  <th>Currency</th>
+                  <th>Frequency</th>
+                  <th>Payment</th>
+                  <th>Monthly TTD</th>
+                  <th>12-month values</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="pane" id="clientsPane">
+        <div class="panel">
+          <div class="filters">
+            <input
+              class="control"
+              id="clientSearch"
+              type="search"
+              placeholder="Search client name or ID"
+            /><select class="control" id="clientProject">
+              <option value="">All projects</option></select
+            ><select class="control" id="clientModule">
+              <option value="">All modules</option></select
+            ><select class="control" id="clientCurrency">
+              <option value="">All currencies</option></select
+            ><select class="control" id="clientStatus">
+              <option value="">All statuses</option></select
+            ><select class="control" id="pricingStatus">
+              <option value="">All pricing status</option>
+            </select>
+          </div>
+          <div class="table-meta">
+            <span>Client revenue records</span
+            ><button class="btn" id="clientExportBtn">
+              Export client revenue
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Client ID</th>
+                  <th>Client Name</th>
+                  <th>Project</th>
+                  <th>Modules</th>
+                  <th>Employees</th>
+                  <th>Currency</th>
+                  <th>Billing</th>
+                  <th>Actual TTD</th>
+                  <th>Actual / Employee</th>
+                  <th>Expected Rate</th>
+                  <th>Expected Revenue</th>
+                  <th>Variance</th>
+                  <th>Pricing Status</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="clientTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="pane" id="pricingPane">
+        <div class="panel">
+          <div class="table-meta">
+            <span>Target Billing Rate per Employee per Month</span
+            ><button class="btn primary" id="addRateBtn">Add module rate</button
+            ><button class="btn" id="resetPricingBtn">Reset pricing</button>
+          </div>
+          <div
+            id="pricingSummary"
+            class="pricing-summary"
+            aria-live="polite"
+          ></div>
+          <p class="chart-note" id="unpricedModules">
+            No client modules discovered.
+          </p>
+          <form id="pricingForm" class="pricing-form" novalidate>
+            <label>Module<input id="rateModule" required /></label
+            ><label>Project<select id="rateProject" required></select></label
+            ><label
+              >Currency<select id="rateCurrency">
+                <option>TTD</option>
+                <option>USD</option>
+              </select></label
+            ><label
+              >Target Billing Rate<input
+                id="rateValue"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+            /></label>
+            <div class="form-actions">
+              <button class="btn primary" type="submit">Save</button
+              ><button class="btn" type="button" id="cancelRateBtn">
+                Cancel
+              </button>
+            </div>
+            <div id="pricingFormError" class="form-error" role="alert"></div>
+          </form>
+          <div class="table-wrap">
+            <table class="data-table pricing-table">
+              <thead>
+                <tr>
+                  <th>Module</th>
+                  <th>Project</th>
+                  <th>Currency</th>
+                  <th>Target rate</th>
+                  <th>TTD equivalent</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pricingTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <section class="pane" id="trendPane">
+        <div class="panel">
+          <div class="chart-tools">
+            <label for="analysisMode">Chart mode</label
+            ><select id="analysisMode">
+              <option value="operational">Monthly Operational Cost</option>
+              <option value="cashflow">Payment Cash Flow</option></select
+            ><button class="toggle-button" id="actualToggle" type="button" aria-pressed="true">✓ Actual Revenue</button
+            ><button class="toggle-button" id="expectedToggle" type="button" aria-pressed="true">✓ Expected Revenue</button
+            ><label
+              ><input type="checkbox" id="applyClientFilters" /> Apply client
+              filters to chart</label
+            ><label
+              ><input type="checkbox" id="showValueLabels" checked /> Show value
+              labels</label
+            ><button class="btn" id="printBtn">Print dashboard</button>
+          </div>
+          <div class="chart-area">
+            <h2 class="chart-title">Financial Trend</h2>
+            <p class="chart-note" id="chartExplanation"></p>
+            <div class="visible-insights" aria-live="polite"><strong>Visible six-month period</strong><span id="visibleInsight"></span></div>
+            <div class="chart-frame">
+              <div class="chart-axis-area">
+                <canvas id="trendYAxis" aria-hidden="true"></canvas>
+              </div>
+              <div class="chart-scroll" id="chartScroll">
+                <div class="chart-plot">
+                  <canvas
+                    id="trendChart"
+                    aria-label="Financial trend: stacked monthly cost bars, green Actual Revenue line and dashed blue Expected Revenue line"
+                  ></canvas>
+                  <div
+                    id="chartTooltip"
+                    class="chart-tooltip"
+                    role="status"
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <div class="period-controls">
+              <button id="previousMonths" type="button">
+                Previous 6 months</button
+              ><span id="visiblePeriod">Showing 12-month period</span
+              ><button id="nextMonths" type="button">Next 6 months</button>
+            </div>
+          </div>
+          <div class="legend" id="legend"></div>
+          <div class="table-meta">
+            <span>Expected operating result</span
+            ><strong id="expectedResult">TTD 0</strong
+            ><button class="btn" id="exportBtn">Export financial trend</button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="vendor/xlsx.full.min.js"></script>
+    <script src="browser-storage.js"></script>
+    <script src="data-import.js"></script>
+    <script src="financial-chart.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
 </html>
