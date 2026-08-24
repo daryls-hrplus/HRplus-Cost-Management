@@ -1,6 +1,6 @@
 (()=>{
   'use strict';
-  const DB_NAME='hrplus-cost-management', STORE='datasets', VERSION=2;
+  const DB_NAME='hrplus-cost-management', STORE='datasets', VERSION=3;
   let db=null;
   const request=(r)=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('IndexedDB request failed.'))});
   const unavailable=()=>!window.indexedDB;

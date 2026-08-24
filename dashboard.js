@@ -5,10 +5,10 @@ Azure Production Hosting,Operational,IT - Software & Cloud,V5,USD,2500,Monthly,2
 Quarterly Taxes,Taxes & Statutories,V5,TTD,131250,Quarterly,43750,525000,2026-01-01,2026-12-31,,Quarterly payment normalized over three months
 Zoho Suite,IT - Software & Cloud,V5,TTD,230860,Annual,19238.3333,230860,2026-01-01,2026-12-31,Zoho,Annual payment
 New Firewall,IT - Hardware & Infrastructure,V5,TTD,47530,One-Time,3960.8333,47530,2026-01-01,2026-12-31,,One-time annual budget allocated over twelve months`;
-  const CLIENT_TEMPLATE = `Client ID,Client Name,Project,Modules,Employee Count,Currency,Monthly Billing Amount,Start Date,End Date,Status,Notes
-CL001,Apex Manufacturing,V5,Workforce|Payroll|Leave,850,TTD,42500,2026-01-01,,Active,Current monthly billing
-CL002,Caribbean Retail Group,V5,Workforce|Payroll|Time and Attendance|Leave,1200,USD,9500,2026-01-01,,Active,USD billing
-CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,Planned Version 6 client`;
+  const CLIENT_TEMPLATE = `Client ID,Client Name,Project,Pricing Model,Modules,Employee Count,Currency,Monthly Billing Amount,Target Increase Percentage,Start Date,End Date,Status,Notes
+CL001,Apex Manufacturing,V5,Per Employee Per Module,Workforce|Payroll|Leave,850,TTD,42500,,2026-01-01,,Active,Standard module pricing
+CL002,Internal Hosting Client,V5,Current Billing + Percentage,Workforce|Payroll,500,TTD,65000,10,2026-01-01,,Active,Increase current monthly billing by 10 percent
+CL003,Regional Services Ltd,V5,Current Billing + Percentage,Workforce|Payroll|Leave,300,USD,5000,7.5,2026-01-01,,Active,Increase current USD billing by 7.5 percent`;
   function setting(key, fallback) {
     try {
       const value = localStorage.getItem(key);
@@ -375,7 +375,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     return { records, warnings, metadata };
   }
   function ingestClientRows(headers, dataRows, metadata) {
-    const required = HRplusImport.required.client,
+    const hasPricingModel = headers.some((header) => HRplusImport.normalizeHeader(header) === "pricing model"),
+      required = HRplusImport.required.client.filter((column) => column !== "Pricing Model" && column !== "Target Increase Percentage"),
       duplicates = canonicalHeaders(headers),
       keys = headers.map(HRplusImport.normalizeHeader),
       missing = required.filter(
@@ -398,9 +399,11 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       records = [];
     dataRows.forEach((cells, index) => {
       const raw = rowMap(headers, cells),
+        pricingModel = hasPricingModel ? HRplusImport.normalizePricingModel(raw["pricing model"]) : "Per Employee Per Module",
         mods = moduleList(HRplusImport.normalizeText(raw.modules)),
         employees = HRplusImport.normalizeNumber(raw["employee count"]),
         billing = HRplusImport.normalizeNumber(raw["monthly billing amount"]),
+        targetIncreasePercentage = HRplusImport.normalizeNumber(raw["target increase percentage"]),
         start = HRplusImport.normalizeDate(raw["start date"]),
         end = raw["end date"]
           ? HRplusImport.normalizeDate(raw["end date"])
@@ -413,6 +416,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         errors.push("missing Client Name");
       if (!HRplusImport.normalizeText(raw.project))
         errors.push("missing Project");
+      if (hasPricingModel && !pricingModel)
+        errors.push("Pricing Model must be Per Employee Per Module or Current Billing + Percentage.");
       if (!mods.modules.length) errors.push("at least one module is required");
       if (employees === null || employees <= 0)
         errors.push("Employee Count must be numeric and greater than zero");
@@ -422,6 +427,14 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         errors.push("Currency must be TTD or USD");
       if (billing === null || billing < 0)
         errors.push("Monthly Billing Amount must be numeric and non-negative");
+      if (pricingModel === "Current Billing + Percentage") {
+        if (targetIncreasePercentage === null)
+          errors.push("Target Increase Percentage is required for Current Billing + Percentage pricing.");
+        else if (targetIncreasePercentage < 0)
+          errors.push("Target Increase Percentage must be zero or greater.");
+      } else if (targetIncreasePercentage !== null) {
+        warnings.push("Line " + (index + 2) + ": Target Increase Percentage is ignored for Per Employee Per Module pricing.");
+      }
       if (!start) errors.push("Start Date must be a valid date");
       if (raw["end date"] && !end) errors.push("End Date must be a valid date");
       if (start && end && end < start)
@@ -454,16 +467,19 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
           clientId: HRplusImport.normalizeText(raw["client id"]),
           clientName: HRplusImport.normalizeText(raw["client name"]),
           project: HRplusImport.normalizeText(raw.project),
+          pricingModel,
           modules: mods.modules,
           employeeCount: employees,
           currency: HRplusImport.normalizeCurrency(raw.currency),
           monthlyBillingAmount: billing,
+          targetIncreasePercentage: pricingModel === "Current Billing + Percentage" ? targetIncreasePercentage : null,
           start,
           end,
           status: HRplusImport.normalizeStatus(raw.status),
           notes: HRplusImport.normalizeText(raw.notes),
         });
     });
+    if (!hasPricingModel) warnings.unshift("Pricing Model was not found. Existing client records were treated as Per Employee Per Module.");
     return { records, warnings, metadata };
   }
   function ingestClientRecords(csvText, fileName) {
@@ -590,7 +606,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     }));
   }
   function deserializeClientRecords(records) {
-    return records.map((r) => ({
+    return records.map((r) => migrateClientRecord({
       ...r,
       start: HRplusImport.normalizeDate(r.start),
       end: r.end ? HRplusImport.normalizeDate(r.end) : null,
@@ -600,7 +616,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     if (!state.storageAvailable) return;
     try {
       await HRplusStorage.saveDataset(id, {
-        schemaVersion: 2,
+        schemaVersion: 3,
         fileName: metadata.fileName,
         fileType: metadata.fileType,
         sheetName: metadata.sheetName,
@@ -718,35 +734,78 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         : 0,
     );
   }
-  function pricing(c) {
-    const configuredModules = c.modules.filter((module) => findRate(module, c.project));
-    const missingModules = c.modules.filter((module) => !findRate(module, c.project));
-    const configuredRate = configuredModules.reduce(
-      (sum, module) => {
-        const rate = findRate(module, c.project);
-        return sum + ttd(rate, rate.rate);
-      },
-      0,
-    );
+  function migrateClientRecord(record) {
     return {
-      status: missingModules.length ? "Pricing Incomplete" : "Pricing Complete",
-      completeRate: missingModules.length ? null : configuredRate,
-      configuredRate,
+      ...record,
+      pricingModel: HRplusImport.normalizePricingModel(record.pricingModel) || "Per Employee Per Module",
+      targetIncreasePercentage: Number.isFinite(Number(record.targetIncreasePercentage)) ? Number(record.targetIncreasePercentage) : null,
+    };
+  }
+  function evaluateModulePricing(client) {
+    const configuredModules = client.modules.filter((module) => findRate(module, client.project));
+    const missingModules = client.modules.filter((module) => !findRate(module, client.project));
+    const configuredMonthlyRevenueTTD = configuredModules.reduce((sum, module) => {
+      const rate = findRate(module, client.project);
+      return sum + ttd(rate, rate.rate) * client.employeeCount;
+    }, 0);
+    const expectedRatePerEmployeeTTD = missingModules.length ? null : configuredMonthlyRevenueTTD / client.employeeCount;
+    const actualMonthlyRevenueTTD = ttd(client, client.monthlyBillingAmount);
+    const actualRatePerEmployeeTTD = client.employeeCount > 0 ? actualMonthlyRevenueTTD / client.employeeCount : null;
+    const expectedMonthlyRevenueTTD = expectedRatePerEmployeeTTD === null ? null : client.employeeCount * expectedRatePerEmployeeTTD;
+    const pricingGapPerEmployeeTTD = expectedRatePerEmployeeTTD === null || actualRatePerEmployeeTTD === null ? null : expectedRatePerEmployeeTTD - actualRatePerEmployeeTTD;
+    return {
+      pricingModel: "Per Employee Per Module",
+      pricingStatus: missingModules.length ? "Pricing Incomplete" : "Pricing Complete",
+      usesModulePricing: true,
+      actualMonthlyRevenueTTD,
+      expectedMonthlyRevenueTTD,
+      configuredMonthlyRevenueTTD,
+      actualRatePerEmployeeTTD,
+      expectedRatePerEmployeeTTD,
+      pricingGapPerEmployeeTTD,
+      pricingGapPercent: expectedRatePerEmployeeTTD ? pricingGapPerEmployeeTTD / expectedRatePerEmployeeTTD * 100 : null,
+      pricingInterpretation: expectedRatePerEmployeeTTD === null ? "Incomplete module pricing" : "Based on configured modules",
       configuredModules,
       missingModules,
     };
   }
+  function evaluatePercentagePricing(client) {
+    const actualMonthlyRevenueTTD = ttd(client, client.monthlyBillingAmount);
+    const actualRatePerEmployeeTTD = client.employeeCount > 0 ? actualMonthlyRevenueTTD / client.employeeCount : null;
+    const complete = Number.isFinite(client.targetIncreasePercentage);
+    const expectedMonthlyRevenueTTD = complete ? actualMonthlyRevenueTTD * (1 + client.targetIncreasePercentage / 100) : null;
+    const expectedRatePerEmployeeTTD = expectedMonthlyRevenueTTD === null || !client.employeeCount ? null : expectedMonthlyRevenueTTD / client.employeeCount;
+    const pricingGapPerEmployeeTTD = expectedRatePerEmployeeTTD === null ? null : expectedRatePerEmployeeTTD - actualRatePerEmployeeTTD;
+    return {
+      pricingModel: "Current Billing + Percentage",
+      pricingStatus: complete ? "Percentage Target Complete" : "Target Percentage Missing",
+      usesModulePricing: false,
+      actualMonthlyRevenueTTD,
+      expectedMonthlyRevenueTTD,
+      configuredMonthlyRevenueTTD: expectedMonthlyRevenueTTD,
+      actualRatePerEmployeeTTD,
+      expectedRatePerEmployeeTTD,
+      pricingGapPerEmployeeTTD,
+      pricingGapPercent: expectedRatePerEmployeeTTD ? pricingGapPerEmployeeTTD / expectedRatePerEmployeeTTD * 100 : null,
+      pricingInterpretation: complete ? `${client.targetIncreasePercentage}% increase on current billing` : "Target percentage missing",
+      configuredModules: [],
+      missingModules: [],
+    };
+  }
+  function evaluateClientPricing(client) {
+    return client.pricingModel === "Current Billing + Percentage" ? evaluatePercentagePricing(client) : evaluateModulePricing(client);
+  }
   function clientExpectedRevenueSchedule(c) {
-    const p = pricing(c);
+    const p = evaluateClientPricing(c);
     return {
       completeExpectedRevenueSchedule: state.months.map((m) =>
-        active(c, m) && c.status !== "Inactive" && p.completeRate !== null
-          ? c.employeeCount * p.completeRate
+        active(c, m) && c.status !== "Inactive" && p.expectedMonthlyRevenueTTD !== null
+          ? p.expectedMonthlyRevenueTTD
           : 0,
       ),
       configuredPricingRevenueSchedule: state.months.map((m) =>
         active(c, m) && c.status !== "Inactive"
-          ? c.employeeCount * p.configuredRate
+          ? p.configuredMonthlyRevenueTTD || 0
           : 0,
       ),
       ...p,
@@ -780,7 +839,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         (!cm || c.modules.includes(cm)) &&
         (!cc || c.currency === cc) &&
         (!cs || c.status === cs) &&
-        (!ps || pricing(c).status === ps),
+        (!$("clientPricingModel").value || c.pricingModel === $("clientPricingModel").value) &&
+        (!ps || evaluateClientPricing(c).pricingStatus === ps),
     );
   }
   function legacyAggregate() {
@@ -815,13 +875,13 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     if (!state.initialized) return;
     buildMonths();
     filter();
-    const vals = aggregate(),
+    const vals = legacyAggregate(),
       cost = vals.costs.reduce((a, b) => a + b, 0),
       actual = vals.actual.reduce((a, b) => a + b, 0),
       expected = vals.expected.reduce((a, b) => a + b, 0),
       incomplete = state.clientRecords
         .filter((c) => c.status === "Active")
-        .flatMap((c) => pricing(c).missing);
+        .flatMap((c) => evaluateClientPricing(c).missingModules);
     $("total24").textContent = "TTD " + money.format(cost);
     $("avgMonth").textContent = "TTD " + money.format(cost / 24);
     $("actualRevenue").textContent = "TTD " + money.format(actual / 24);
@@ -847,7 +907,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     const body = $("tableBody");
     $("resultCount").textContent = state.filteredCosts.length + " of " + state.costRecords.length + " items";
     body.innerHTML = state.filteredCosts.map((record) => `<tr><td><strong>${esc(record.item)}</strong></td><td><span class="pill">${esc(record.recordType || "Operational")}</span></td><td>${esc(record.category)} / ${esc(record.project)}</td><td>${esc(record.currency)} ${money2.format(record.paymentAmount)} · ${esc(record.frequency)}</td><td>TTD ${money2.format(ttd(record, record.monthlyAmount))}</td><td>${mk(record.start)} – ${record.end ? mk(record.end) : "Ongoing"}</td><td><button class="btn" type="button" data-cost-detail="${record.id}">View</button></td></tr>`).join("");
-    $("clientTableBody").innerHTML = state.filteredClients.map((client) => { const pricingResult = clientExpectedRevenueSchedule(client), actual = ttd(client, client.monthlyBillingAmount), actualRate = client.employeeCount > 0 ? actual / client.employeeCount : null, expectedRate = pricingResult.completeRate, gap = expectedRate === null || actualRate === null ? null : expectedRate - actualRate, interpretation = gap === null ? "Incomplete" : gap > 0 ? `${money2.format(gap)} below target` : gap < 0 ? `${money2.format(Math.abs(gap))} above target` : "On target"; return `<tr><td><strong>${esc(client.clientName)}</strong><div class="item-sub">${esc(client.clientId)}</div></td><td>${esc(client.project)} · ${esc(client.status)}</td><td>${client.modules.map((module) => `<span class="pill">${esc(module)}</span>`).join(" ")}</td><td>${client.employeeCount}</td><td>${client.currency} ${money2.format(client.monthlyBillingAmount)}<br>TTD ${money2.format(actual)}</td><td>TTD ${actualRate === null ? "—" : money2.format(actualRate)}</td><td>${expectedRate === null ? "Incomplete" : "TTD " + money2.format(expectedRate)}</td><td>${interpretation}</td><td>${esc(pricingResult.status)}</td><td><button class="btn" type="button" data-client-detail="${client.id}">View</button></td></tr>`; }).join("");
+    $("clientTableBody").innerHTML = state.filteredClients.map((client) => { const pricingResult = evaluateClientPricing(client), gap = pricingResult.pricingGapPerEmployeeTTD, interpretation = gap === null ? "Incomplete" : gap > 0 ? `${money2.format(gap)} more per employee` : gap < 0 ? `${money2.format(Math.abs(gap))} less per employee` : "On target"; return `<tr><td><strong>${esc(client.clientName)}</strong><div class="item-sub">${esc(client.clientId)}</div></td><td>${esc(client.project)} · ${esc(client.status)}</td><td><strong>${esc(client.pricingModel)}</strong><div class="item-sub">${client.modules.map((module) => esc(module)).join(" · ")}</div></td><td>${client.employeeCount}</td><td>${client.currency} ${money2.format(client.monthlyBillingAmount)}<br>TTD ${money2.format(pricingResult.actualMonthlyRevenueTTD)}</td><td>TTD ${pricingResult.actualRatePerEmployeeTTD === null ? "—" : money2.format(pricingResult.actualRatePerEmployeeTTD)}</td><td>${pricingResult.expectedRatePerEmployeeTTD === null ? "Incomplete" : "TTD " + money2.format(pricingResult.expectedRatePerEmployeeTTD)}<div class="item-sub">${esc(pricingResult.pricingInterpretation)}</div></td><td>${interpretation}${pricingResult.pricingGapPercent === null ? "" : `<div class="item-sub">Gap: ${pricingResult.pricingGapPercent.toFixed(2)}%</div>`}</td><td>${esc(pricingResult.pricingStatus)}</td><td><button class="btn" type="button" data-client-detail="${client.id}">View</button></td></tr>`; }).join("");
   }
   function unusedTableRenderer() {
     const body = $("tableBody");
@@ -956,7 +1016,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     c.height = h * d;
     const x = c.getContext("2d");
     x.scale(d, d);
-    const a = aggregate(),
+    const a = legacyAggregate(),
       max =
         Math.max(
           1,
@@ -1051,6 +1111,18 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
       if (cell) cell.s = { font: { bold: true } };
     }
+    const percentageColumn = headers.indexOf("Target Increase Percentage");
+    if (percentageColumn >= 0) {
+      const cell = ws[XLSX.utils.encode_cell({ r: 0, c: percentageColumn })];
+      cell.c = [{ a: "HRplus", t: "Enter percentage points: 10 means 10%. Do not enter 0.10." }];
+      for (let r = 1; r <= range.e.r; r++) {
+        const valueCell = ws[XLSX.utils.encode_cell({ r, c: percentageColumn })];
+        if (valueCell && valueCell.v !== "" && Number.isFinite(Number(valueCell.v))) {
+          valueCell.v = Number(valueCell.v);
+          valueCell.t = "n";
+        }
+      }
+    }
     for (let r = 1; r <= range.e.r; r++)
       for (let c = 0; c <= range.e.c; c++) {
         const cell = ws[XLSX.utils.encode_cell({ r, c })];
@@ -1103,6 +1175,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     "clientModule",
     "clientCurrency",
     "clientStatus",
+    "clientPricingModel",
     "pricingStatus",
   ].forEach((id) => ($(id).oninput = $(id).onchange = render));
   $("actualToggle").onclick = (e) => {
@@ -1126,6 +1199,10 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     ingestClientRecords,
     clientActualRevenueSchedule,
     clientExpectedRevenueSchedule,
+    evaluateClientPricing,
+    evaluateModulePricing,
+    evaluatePercentagePricing,
+    migrateClientRecord,
     findRate,
   };
   buildMonths();
@@ -1148,38 +1225,48 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         "Client ID",
         "Client Name",
         "Project",
+        "Pricing Model",
         "Modules",
         "Employee Count",
         "Source Currency",
         "Monthly Billing Amount",
+        "Target Increase Percentage",
         "Actual Monthly Revenue TTD",
         "Actual Revenue Per Employee TTD",
-        "Expected Rate Per Employee TTD",
         "Expected Monthly Revenue TTD",
-        "Pricing Variance TTD",
+        "Expected Revenue Per Employee TTD",
+        "Increase Per Employee TTD",
+        "Pricing Gap Percent",
+        "Target Increase Percent",
+        "Pricing Interpretation",
         "Pricing Status",
         "Start Date",
         "End Date",
         "Status",
       ],
       ...state.filteredClients.map((c) => {
-        const p = clientExpectedRevenueSchedule(c),
-          a = ttd(c, c.monthlyBillingAmount),
-          e = p.rate === null ? "" : c.employeeCount * p.rate;
+        const p = evaluateClientPricing(c),
+          a = p.actualMonthlyRevenueTTD,
+          e = p.expectedMonthlyRevenueTTD;
         return [
           c.clientId,
           c.clientName,
           c.project,
+          c.pricingModel,
           c.modules.join("|"),
           c.employeeCount,
           c.currency,
           c.monthlyBillingAmount,
+          c.targetIncreasePercentage ?? "",
           a,
-          a / c.employeeCount,
-          p.rate ?? "",
-          e,
-          e === "" ? "" : e - a,
-          p.status,
+          p.actualRatePerEmployeeTTD ?? "",
+          e ?? "",
+          p.expectedRatePerEmployeeTTD ?? "",
+          p.pricingGapPerEmployeeTTD ?? "",
+          p.pricingGapPercent ?? "",
+          c.targetIncreasePercentage ?? "",
+          p.pricingInterpretation,
+          p.pricingStatus,
           mk(c.start),
           c.end ? mk(c.end) : "",
           c.status,
@@ -1187,7 +1274,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       }),
     ]);
   $("exportBtn").onclick = () => {
-    const a = aggregate();
+    const a = legacyAggregate();
     exportRows("financial-trend.csv", [
       [
         "Month",
@@ -1232,7 +1319,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         const saved = await HRplusStorage.getDataset(item.id);
         if (!saved) continue;
         if (
-          ![1, 2].includes(saved.schemaVersion) ||
+          ![1, 2, 3].includes(saved.schemaVersion) ||
           !Array.isArray(saved.records) ||
           !Array.isArray(saved.warnings)
         )
@@ -1365,7 +1452,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
   }
   function getDiscoveredModules(clientRecords) {
     const found = new Map();
-    (clientRecords || [])
+    (clientRecords || []).filter((client) => client.pricingModel === "Per Employee Per Module")
       .flatMap((client) =>
         Array.isArray(client.modules) ? client.modules : [],
       )
@@ -1455,18 +1542,18 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     const rows = buildModulePricingRows(state.clientRecords, state.moduleRates),
       missing = rows.filter((row) => !row.configured),
       summary = $("pricingSummary");
+    const moduleClients = state.clientRecords.filter((client) => client.pricingModel === "Per Employee Per Module"),
+      percentageClients = state.clientRecords.filter((client) => client.pricingModel === "Current Billing + Percentage"),
+      percentageMissing = percentageClients.filter((client) => !Number.isFinite(client.targetIncreasePercentage));
     summary.textContent =
-      getDiscoveredModules(state.clientRecords).length +
-      " modules discovered · " +
-      rows.filter((row) => row.configured).length +
-      " configured · " +
-      missing.length +
-      " not configured";
+      getDiscoveredModules(moduleClients).length + " required modules · " +
+      rows.filter((row) => row.configured && row.discovered).length + " configured · " +
+      percentageClients.filter((client) => Number.isFinite(client.targetIncreasePercentage)).length + " of " + percentageClients.length + " percentage targets configured";
     summary.className =
-      "pricing-summary " + (missing.length ? "incomplete" : "complete");
+      "pricing-summary " + (missing.length || percentageMissing.length ? "incomplete" : "complete");
     $("unpricedModules").textContent = missing.length
-      ? "Not configured: " + missing.map((row) => row.module).join(", ")
-      : "All discovered modules have pricing.";
+      ? "Not configured: " + missing.map((row) => row.module).join(", ") + (percentageMissing.length ? ". Percentage target missing: " + percentageMissing.map((client) => client.clientName).join(", ") : "")
+      : percentageMissing.length ? "Percentage target missing: " + percentageMissing.map((client) => client.clientName).join(", ") : "All required module pricing and percentage targets are configured.";
     $("pricingTableBody").innerHTML = rows.map((row) => {
       const projects = pricingProjects();
       const options = projects.map((project) => `<option ${normalizeProjectKey(project) === normalizeProjectKey(row.project) ? "selected" : ""}>${esc(project)}</option>`).join("");
@@ -1495,12 +1582,20 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
           0,
         ),
       ),
+      modulePricedClients = reportingClients.filter((client) => client.pricingModel === "Per Employee Per Module"),
+      percentagePricedClients = reportingClients.filter((client) => client.pricingModel === "Current Billing + Percentage"),
       completeExpectedRevenue = months.map((_, i) =>
         reportingClients.reduce(
           (sum, client) =>
             sum + clientExpectedRevenueSchedule(client).completeExpectedRevenueSchedule[i],
           0,
         ),
+      ),
+      moduleBasedExpectedRevenue = months.map((_, i) =>
+        modulePricedClients.reduce((sum, client) => sum + clientExpectedRevenueSchedule(client).completeExpectedRevenueSchedule[i], 0),
+      ),
+      percentageBasedExpectedRevenue = months.map((_, i) =>
+        percentagePricedClients.reduce((sum, client) => sum + clientExpectedRevenueSchedule(client).completeExpectedRevenueSchedule[i], 0),
       ),
       configuredPricingRevenue = months.map((_, i) =>
         reportingClients.reduce(
@@ -1511,16 +1606,17 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       ),
       missingModules = [
         ...new Set(
-          reportingClients.flatMap((client) => pricing(client).missingModules),
+          modulePricedClients.flatMap((client) => evaluateClientPricing(client).missingModules),
         ),
       ],
-      configuredModuleCount = getDiscoveredModules(clientRecords).filter((module) =>
-        reportingClients.every((client) => findRate(module, client.project)),
+      configuredModuleCount = getDiscoveredModules(reportingClients).filter((module) =>
+        modulePricedClients.every((client) => findRate(module, client.project)),
       ).length,
-      requiredModuleCount = getDiscoveredModules(reportingClients).length,
-      expectedComplete = reportingClients.every(
-        (client) => pricing(client).missingModules.length === 0,
-      ),
+      requiredModuleCount = getDiscoveredModules(modulePricedClients).length,
+      missingPercentageClients = percentagePricedClients.filter((client) => !Number.isFinite(client.targetIncreasePercentage)).map((client) => client.clientName),
+      modulePricingComplete = modulePricedClients.every((client) => evaluateClientPricing(client).pricingStatus === "Pricing Complete"),
+      percentagePricingComplete = percentagePricedClients.every((client) => Number.isFinite(client.targetIncreasePercentage)),
+      expectedComplete = modulePricingComplete && percentagePricingComplete,
       groups = [...new Set((costRecords || []).map((record) => record[$("groupBy")?.value || "project"]))],
       groupValues = Object.fromEntries(groups.map((group) => [group, months.map((_, i) => (costRecords || []).filter((record) => record[$("groupBy")?.value || "project"] === group).reduce((sum, record) => sum + costSchedule(record)[i], 0))]));
     return {
@@ -1529,11 +1625,16 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       overallRequirement: operationalRequirement.map((value, index) => value + debtRequirement[index]),
       actualRevenue: actual,
       completeExpectedRevenue,
+      moduleBasedExpectedRevenue,
+      percentageBasedExpectedRevenue,
       configuredPricingRevenue,
       expectedComplete,
       configuredModuleCount,
       requiredModuleCount,
       missingModules,
+      missingPercentageClients,
+      modulePricedClients,
+      percentagePricedClients,
       groups,
       groupValues,
       months,
@@ -1574,7 +1675,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     $("fundingResultNote").textContent = `${period} · Coverage ${averageOverall ? (averageActual / averageOverall * 100).toFixed(1) : "0.0"}%`;
     $("pricingWarning").textContent = series.expectedComplete
       ? ""
-      : `Expected revenue is incomplete. Missing: ${series.missingModules.join(", ") || "none"}.`;
+      : `Expected revenue is incomplete. Missing module rates: ${series.missingModules.join(", ") || "none"}. Missing percentage targets: ${series.missingPercentageClients.join(", ") || "none"}.`;
   }
   function render() {
     if (!state.initialized) return;
@@ -1752,10 +1853,12 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         "Actual Revenue TTD",
         "Configured Pricing Revenue TTD",
         "Expected Revenue TTD",
+        "Module-Based Expected Revenue TTD",
+        "Percentage-Based Expected Revenue TTD",
+        "Pricing Complete",
         "Operating Profit or Loss TTD",
         "Funding Surplus or Shortfall TTD",
         "Overall Coverage Percent",
-        "Pricing Complete",
       ],
       ...state.months.map((month, i) => [
         mk(month),
@@ -1765,6 +1868,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         series.actualRevenue[i],
         series.configuredPricingRevenue[i],
         series.expectedComplete ? series.completeExpectedRevenue[i] : "",
+        series.moduleBasedExpectedRevenue[i],
+        series.percentageBasedExpectedRevenue[i],
         series.expectedComplete ? "Yes" : "No",
         series.actualRevenue[i] - series.operationalRequirement[i],
         series.actualRevenue[i] - series.overallRequirement[i],
@@ -1780,6 +1885,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     getDiscoveredModules,
     buildModulePricingRows,
     calculateFinancialSeries,
+    evaluateClientPricing,
+    migrateClientRecord,
     findRate,
   };
 })();

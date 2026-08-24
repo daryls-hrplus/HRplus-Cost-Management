@@ -371,6 +371,8 @@
         background: white;
       }
       .toggle-button,.group-button{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 10px;font-weight:750}
+      .line-swatch{display:inline-block;width:22px;height:3px;margin-right:7px;vertical-align:middle;border-radius:2px;background:var(--line-color);}
+      .line-swatch.dashed{background:repeating-linear-gradient(90deg,var(--line-color) 0 7px,transparent 7px 11px)}
       .toggle-button[aria-pressed="false"],.group-button[aria-pressed="false"]{color:var(--muted);background:#f3f5f8;opacity:.7}
       .toggle-button[aria-pressed="true"]{border-color:var(--green);color:var(--green);background:#effaf5}
       .group-buttons{display:flex;gap:6px;flex-wrap:wrap;width:100%;order:4}
@@ -794,8 +796,17 @@
               <option value="">All currencies</option></select
             ><select class="control" id="clientStatus">
               <option value="">All statuses</option></select
+            ><select class="control" id="clientPricingModel">
+              <option value="">All Pricing Models</option>
+              <option>Per Employee Per Module</option>
+              <option>Current Billing + Percentage</option>
+            </select
             ><select class="control" id="pricingStatus">
               <option value="">All pricing status</option>
+              <option>Pricing Complete</option>
+              <option>Pricing Incomplete</option>
+              <option>Percentage Target Complete</option>
+              <option>Target Percentage Missing</option>
             </select>
           </div>
           <div class="table-meta">
@@ -808,7 +819,7 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Client</th><th>Project / Status</th><th>Modules</th><th>Employees</th><th>Actual Billing / Month</th><th>Actual / Employee / Month</th><th>Expected / Employee / Month</th><th>Pricing Gap</th><th>Pricing Status</th><th>Details</th>
+                  <th>Client</th><th>Project / Status</th><th>Pricing Model / Modules</th><th>Employees</th><th>Actual Billing / Month</th><th>Actual / Employee / Month</th><th>Expected / Employee / Month</th><th>Pricing Gap</th><th>Pricing Status</th><th>Details</th>
                 </tr>
               </thead>
               <tbody id="clientTableBody"></tbody>
@@ -876,10 +887,10 @@
       <section class="pane" id="trendPane">
         <div class="panel">
           <div class="chart-tools">
-            <button class="toggle-button" id="operationalToggle" type="button" aria-pressed="true">✓ Operational Requirement</button
-            ><button class="toggle-button" id="debtToggle" type="button" aria-pressed="true">✓ Include Debt</button
-            ><button class="toggle-button" id="actualToggle" type="button" aria-pressed="true">✓ Actual Revenue</button
-            ><button class="toggle-button" id="expectedToggle" type="button" aria-pressed="true">✓ Expected Revenue</button
+            <button class="toggle-button" id="operationalToggle" type="button" aria-pressed="true"><span class="line-swatch" style="--line-color:#2671d9"></span>Operational Requirement</button
+            ><button class="toggle-button" id="debtToggle" type="button" aria-pressed="true"><span class="line-swatch" style="--line-color:#243b64"></span>Overall Requirement</button
+            ><button class="toggle-button" id="actualToggle" type="button" aria-pressed="true"><span class="line-swatch" style="--line-color:#159a74"></span>Actual Revenue</button
+            ><button class="toggle-button" id="expectedToggle" type="button" aria-pressed="true"><span class="line-swatch dashed" style="--line-color:#7657c9"></span>Expected Revenue</button
             ><label
               ><input type="checkbox" id="applyClientFilters" /> Apply client
               filters to chart</label

@@ -18,6 +18,17 @@ Overall Requirement equals Operational Requirement plus Debt Requirement. Operat
 
 Files without Record Type remain compatible and default to Operational with a warning. Blank Record Type values use the same default. Client pricing gaps are calculated per employee as expected rate minus actual rate; positive means below target, negative means above target, and incomplete pricing has no definitive percentage.
 
+## Client pricing models
+
+Client Revenue supports two explicit pricing models:
+
+- **Per Employee Per Module** uses employee count multiplied by the sum of applicable module rates. Missing module rates make expected revenue incomplete.
+- **Current Billing + Percentage** uses the imported Monthly Billing Amount as the actual revenue baseline and applies the Target Increase Percentage to that amount. Enter percentage points: `10` means a 10% increase, `7.5` means 7.5%, and `0` means no increase. The percentage is applied to the imported baseline for every active reporting month and is not compounded from one month to the next.
+
+Employee counts remain relevant for comparative actual and expected per-employee values. Module prices do not apply to Current Billing + Percentage clients, and changing module prices cannot change their actual or expected revenue. A missing target percentage makes Expected Revenue incomplete and identifies the client by name; it is not treated as zero.
+
+Older client files without Pricing Model are accepted and each record is migrated as Per Employee Per Module with one import warning. Cached client records are migrated in the same way, while pricingModel and targetIncreasePercentage are persisted explicitly in IndexedDB. Imported client records are never stored in localStorage.
+
 Persistence is most reliable when the dashboard is opened from a stable HTTPS origin, such as GitHub Pages. The dashboard can also be opened directly from the filesystem, but browser handling of `file:` URLs differs and persistence is not guaranteed. If IndexedDB is unavailable or blocked, imports remain usable for the current session and the dashboard displays a warning that they cannot be restored after refresh.
 
 Use the independent clear controls to remove either dataset, or **Clear All Browser Data** to remove both datasets and non-pricing dashboard settings. Module pricing is intentionally preserved because it is reusable configuration. Data belonging to other applications is not touched.

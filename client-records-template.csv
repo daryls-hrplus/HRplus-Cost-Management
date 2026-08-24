@@ -1,4 +1,4 @@
-Client ID,Client Name,Project,Modules,Employee Count,Currency,Monthly Billing Amount,Start Date,End Date,Status,Notes
-CL001,Apex Manufacturing,V5,Workforce|Payroll|Leave,850,TTD,42500,2026-01-01,,Active,Current monthly billing
-CL002,Caribbean Retail Group,V5,Workforce|Payroll|Time and Attendance|Leave,1200,USD,9500,2026-01-01,,Active,USD billing
-CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,Planned Version 6 client
+Client ID,Client Name,Project,Pricing Model,Modules,Employee Count,Currency,Monthly Billing Amount,Target Increase Percentage,Start Date,End Date,Status,Notes
+CL001,Apex Manufacturing,V5,Per Employee Per Module,Workforce|Payroll|Leave,850,TTD,42500,,2026-01-01,,Active,Standard module pricing
+CL002,Internal Hosting Client,V5,Current Billing + Percentage,Workforce|Payroll,500,TTD,65000,10,2026-01-01,,Active,Increase current monthly billing by 10 percent
+CL003,Regional Services Ltd,V5,Current Billing + Percentage,Workforce|Payroll|Leave,300,USD,5000,7.5,2026-01-01,,Active,Increase current USD billing by 7.5 percent
