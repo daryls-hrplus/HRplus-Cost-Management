@@ -277,7 +277,7 @@
       .data-table {
         border-collapse: separate;
         border-spacing: 0;
-        min-width: 2350px;
+        min-width: 0;
         width: 100%;
         font-size: 12px;
       }
@@ -710,10 +710,20 @@
       </p>
       <section class="notice" id="notice" role="alert"></section>
       <section class="cards" aria-label="Financial summary">
-        <article class="card accent-green">
-          <div class="card-label" id="avgMonthLabel">Average Monthly Operational Cost</div>
+        <article class="card accent-blue">
+          <div class="card-label" id="avgMonthLabel">Average Monthly Operational Requirement</div>
           <div class="card-value" id="avgMonth">TTD 0</div>
           <div class="card-note" id="avgMonthNote"></div>
+        </article>
+        <article class="card accent-amber">
+          <div class="card-label">Average Monthly Debt Requirement</div>
+          <div class="card-value" id="averageDebt">TTD 0</div>
+          <div class="card-note" id="averageDebtNote"></div>
+        </article>
+        <article class="card accent-blue">
+          <div class="card-label">Average Monthly Overall Requirement</div>
+          <div class="card-value" id="averageOverall">TTD 0</div>
+          <div class="card-note" id="averageOverallNote"></div>
         </article>
         <article class="card accent-green">
           <div class="card-label" id="actualRevenueLabel">Average Monthly Actual Revenue</div>
@@ -721,14 +731,14 @@
           <div class="card-note" id="actualRevenueNote"></div>
         </article>
         <article class="card accent-green">
-          <div class="card-label" id="actualResultLabel">Average Monthly Result</div>
-          <div class="card-value" id="actualResult">Break-even</div>
-          <div class="card-note" id="actualResultNote"></div>
+          <div class="card-label" id="operatingResultLabel">Average Monthly Operating Result</div>
+          <div class="card-value" id="operatingResult">Break-even</div>
+          <div class="card-note" id="operatingResultNote"></div>
         </article>
-        <article class="card accent-blue">
-          <div class="card-label" id="expectedRevenueLabel">Pricing Target</div>
-          <div class="card-value" id="expectedRevenue">TTD 0</div>
-          <div class="card-note" id="expectedRevenueNote"></div>
+        <article class="card accent-amber">
+          <div class="card-label" id="fundingResultLabel">Average Monthly Funding Result</div>
+          <div class="card-value" id="fundingResult">Break-even</div>
+          <div class="card-note" id="fundingResultNote"></div>
         </article>
       </section>
       <p id="pricingWarning" class="pricing-warning"></p>
@@ -760,13 +770,7 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Item</th>
-                  <th>Category / Project</th>
-                  <th>Currency</th>
-                  <th>Frequency</th>
-                  <th>Payment</th>
-                  <th>Monthly TTD</th>
-                  <th>12-month values</th>
+                  <th>Item</th><th>Record Type</th><th>Category / Project</th><th>Payment Terms</th><th>Monthly Requirement TTD</th><th>Effective Period</th><th>Details</th>
                 </tr>
               </thead>
               <tbody id="tableBody"></tbody>
@@ -804,22 +808,7 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Client ID</th>
-                  <th>Client Name</th>
-                  <th>Project</th>
-                  <th>Modules</th>
-                  <th>Employees</th>
-                  <th>Currency</th>
-                  <th>Billing</th>
-                  <th>Actual TTD</th>
-                  <th>Actual / Employee</th>
-                  <th>Expected Rate</th>
-                  <th>Expected Revenue</th>
-                  <th>Variance</th>
-                  <th>Pricing Status</th>
-                  <th>Start</th>
-                  <th>End</th>
-                  <th>Status</th>
+                  <th>Client</th><th>Project / Status</th><th>Modules</th><th>Employees</th><th>Actual Billing / Month</th><th>Actual / Employee / Month</th><th>Expected / Employee / Month</th><th>Pricing Gap</th><th>Pricing Status</th><th>Details</th>
                 </tr>
               </thead>
               <tbody id="clientTableBody"></tbody>
@@ -887,10 +876,8 @@
       <section class="pane" id="trendPane">
         <div class="panel">
           <div class="chart-tools">
-            <label for="analysisMode">Chart mode</label
-            ><select id="analysisMode">
-              <option value="operational">Monthly Operational Cost</option>
-              <option value="cashflow">Payment Cash Flow</option></select
+            <button class="toggle-button" id="operationalToggle" type="button" aria-pressed="true">✓ Operational Requirement</button
+            ><button class="toggle-button" id="debtToggle" type="button" aria-pressed="true">✓ Include Debt</button
             ><button class="toggle-button" id="actualToggle" type="button" aria-pressed="true">✓ Actual Revenue</button
             ><button class="toggle-button" id="expectedToggle" type="button" aria-pressed="true">✓ Expected Revenue</button
             ><label
@@ -902,7 +889,7 @@
             ><button class="btn" id="printBtn">Print dashboard</button>
           </div>
           <div class="chart-area">
-            <h2 class="chart-title">Financial Trend</h2>
+            <h2 class="chart-title">Monthly Requirements and Revenue</h2>
             <p class="chart-note" id="chartExplanation"></p>
             <div class="visible-insights" aria-live="polite"><strong>Visible six-month period</strong><span id="visibleInsight"></span></div>
             <div class="chart-frame">

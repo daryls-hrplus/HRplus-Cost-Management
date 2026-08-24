@@ -1,7 +1,7 @@
 (() => {
   "use strict";
-  const COST_TEMPLATE = `Item Name,Category,Project,Currency,Payment Amount,Payment Frequency,Monthly Amount,Yearly Amount,Start Date,End Date,Vendor,Notes
-Azure Production Hosting,IT - Software & Cloud,V5,USD,2500,Monthly,2500,30000,2026-01-01,2026-12-31,Microsoft,Monthly payment
+  const COST_TEMPLATE = `Item Name,Record Type,Category,Project,Currency,Payment Amount,Payment Frequency,Monthly Amount,Yearly Amount,Start Date,End Date,Vendor,Notes
+Azure Production Hosting,Operational,IT - Software & Cloud,V5,USD,2500,Monthly,2500,30000,2026-01-01,2026-12-31,Microsoft,Monthly hosting requirement
 Quarterly Taxes,Taxes & Statutories,V5,TTD,131250,Quarterly,43750,525000,2026-01-01,2026-12-31,,Quarterly payment normalized over three months
 Zoho Suite,IT - Software & Cloud,V5,TTD,230860,Annual,19238.3333,230860,2026-01-01,2026-12-31,Zoho,Annual payment
 New Firewall,IT - Hardware & Infrastructure,V5,TTD,47530,One-Time,3960.8333,47530,2026-01-01,2026-12-31,,One-time annual budget allocated over twelve months`;
@@ -33,7 +33,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     costImportedAt: "",
     clientImportedAt: "",
     fx: Number(localStorage.getItem("opcost-fx")) || 6.78,
-    mode: setting("hrplus-analysis-mode", "operational"),
+    showOperational: setting("hrplus-show-operational", true),
+    showDebt: setting("hrplus-show-debt", true),
     showActual: setting("hrplus-show-actual", true),
     showExpected: setting("hrplus-show-expected", true),
     storageAvailable: true,
@@ -278,7 +279,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     );
   }
   function ingestOperationalRows(headers, dataRows, metadata) {
-    const required = HRplusImport.required.operational,
+    const hasRecordType = headers.some((header) => HRplusImport.normalizeHeader(header) === "record type"),
+      required = ["Item Name", "Category", "Project", "Currency", "Payment Amount", "Payment Frequency", "Start Date"],
       duplicates = canonicalHeaders(headers),
       keys = headers.map(HRplusImport.normalizeHeader),
       missing = required.filter(
@@ -310,8 +312,11 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
           : null,
         errors = [],
         row = index + 2;
+      const rawType = HRplusImport.normalizeRecordType(raw["record type"]);
       if (!HRplusImport.normalizeText(raw["item name"]))
         errors.push("missing Item Name");
+      if (hasRecordType && HRplusImport.normalizeText(raw["record type"]) && !rawType)
+        errors.push("Record Type must be Operational or Debt.");
       if (payment === null || payment < 0)
         errors.push("Payment Amount must be numeric and non-negative");
       if (
@@ -336,10 +341,13 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
             ": " +
             errors.join("; "),
         );
-      else
+      else {
+        if (!hasRecordType || !HRplusImport.normalizeText(raw["record type"]))
+          warnings.push((metadata.sheetName || metadata.fileName) + ", row " + row + ": Record Type defaulted to Operational.");
         records.push({
           id: row,
           item: HRplusImport.normalizeText(raw["item name"]),
+          recordType: rawType || "Operational",
           category: HRplusImport.normalizeText(raw.category) || "Uncategorised",
           project: HRplusImport.normalizeText(raw.project) || "Unassigned",
           currency: HRplusImport.normalizeCurrency(raw.currency),
@@ -361,7 +369,9 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
           vendor: HRplusImport.normalizeText(raw.vendor),
           notes: HRplusImport.normalizeText(raw.notes),
         });
+      }
     });
+    if (!hasRecordType) warnings.unshift((metadata.sheetName || metadata.fileName) + ": Record Type column not found; all records defaulted to Operational.");
     return { records, warnings, metadata };
   }
   function ingestClientRows(headers, dataRows, metadata) {
@@ -567,6 +577,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
   function deserializeOperationalRecords(records) {
     return records.map((r) => ({
       ...r,
+      recordType: HRplusImport.normalizeRecordType(r.recordType) || "Operational",
       start: HRplusImport.normalizeDate(r.start),
       end: r.end ? HRplusImport.normalizeDate(r.end) : null,
     }));
@@ -589,7 +600,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     if (!state.storageAvailable) return;
     try {
       await HRplusStorage.saveDataset(id, {
-        schemaVersion: 1,
+        schemaVersion: 2,
         fileName: metadata.fileName,
         fileType: metadata.fileType,
         sheetName: metadata.sheetName,
@@ -700,21 +711,6 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       active(r, m) ? ttd(r, r.monthlyAmount) : 0,
     );
   }
-  function paymentSchedule(r) {
-    return state.months.map((m) => {
-      if (!active(r, m)) return 0;
-      const d =
-          (m.getFullYear() - r.start.getFullYear()) * 12 +
-          m.getMonth() -
-          r.start.getMonth(),
-        due =
-          r.frequency === "Monthly" ||
-          (r.frequency === "Quarterly" && d % 3 === 0) ||
-          (r.frequency === "Annual" && d % 12 === 0) ||
-          (r.frequency === "One-Time" && d === 0);
-      return due ? ttd(r, r.paymentAmount) : 0;
-    });
-  }
   function clientActualRevenueSchedule(c) {
     return state.months.map((m) =>
       active(c, m) && c.status !== "Inactive"
@@ -795,9 +791,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         state.costRecords.reduce(
           (s, r) =>
             s +
-            (state.mode === "cashflow"
-              ? paymentSchedule(r)[i]
-              : costSchedule(r)[i]),
+            costSchedule(r)[i],
           0,
         ),
       ),
@@ -817,7 +811,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         );
     return { costs, actual, expected, expectedComplete };
   }
-  function legacyRender() {
+  function unusedRender() {
     if (!state.initialized) return;
     buildMonths();
     filter();
@@ -850,6 +844,12 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     notice([...state.costWarnings, ...state.clientWarnings]);
   }
   function renderTables() {
+    const body = $("tableBody");
+    $("resultCount").textContent = state.filteredCosts.length + " of " + state.costRecords.length + " items";
+    body.innerHTML = state.filteredCosts.map((record) => `<tr><td><strong>${esc(record.item)}</strong></td><td><span class="pill">${esc(record.recordType || "Operational")}</span></td><td>${esc(record.category)} / ${esc(record.project)}</td><td>${esc(record.currency)} ${money2.format(record.paymentAmount)} · ${esc(record.frequency)}</td><td>TTD ${money2.format(ttd(record, record.monthlyAmount))}</td><td>${mk(record.start)} – ${record.end ? mk(record.end) : "Ongoing"}</td><td><button class="btn" type="button" data-cost-detail="${record.id}">View</button></td></tr>`).join("");
+    $("clientTableBody").innerHTML = state.filteredClients.map((client) => { const pricingResult = clientExpectedRevenueSchedule(client), actual = ttd(client, client.monthlyBillingAmount), actualRate = client.employeeCount > 0 ? actual / client.employeeCount : null, expectedRate = pricingResult.completeRate, gap = expectedRate === null || actualRate === null ? null : expectedRate - actualRate, interpretation = gap === null ? "Incomplete" : gap > 0 ? `${money2.format(gap)} below target` : gap < 0 ? `${money2.format(Math.abs(gap))} above target` : "On target"; return `<tr><td><strong>${esc(client.clientName)}</strong><div class="item-sub">${esc(client.clientId)}</div></td><td>${esc(client.project)} · ${esc(client.status)}</td><td>${client.modules.map((module) => `<span class="pill">${esc(module)}</span>`).join(" ")}</td><td>${client.employeeCount}</td><td>${client.currency} ${money2.format(client.monthlyBillingAmount)}<br>TTD ${money2.format(actual)}</td><td>TTD ${actualRate === null ? "—" : money2.format(actualRate)}</td><td>${expectedRate === null ? "Incomplete" : "TTD " + money2.format(expectedRate)}</td><td>${interpretation}</td><td>${esc(pricingResult.status)}</td><td><button class="btn" type="button" data-client-detail="${client.id}">View</button></td></tr>`; }).join("");
+  }
+  function unusedTableRenderer() {
     const body = $("tableBody");
     $("resultCount").textContent =
       state.filteredCosts.length + " of " + state.costRecords.length + " items";
@@ -921,7 +921,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       })
       .join("");
   }
-  function legacyRenderPricing() {
+  function unusedRenderPricing() {
     const mods = [...new Set(state.clientRecords.flatMap((c) => c.modules))];
     $("pricingTableBody").innerHTML = state.moduleRates
       .map(
@@ -947,7 +947,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       mods.filter((m) => !findRate(m, "All")).join(", ") ||
       "All discovered modules have pricing.";
   }
-  function legacyRenderChart() {
+  function unusedRenderChart() {
     const c = $("trendChart"),
       w = c.parentElement.clientWidth || 600,
       h = 380,
@@ -990,9 +990,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
             .reduce(
               (s, r) =>
                 s +
-                (state.mode === "cashflow"
-                  ? paymentSchedule(r)[i]
-                  : costSchedule(r)[i]),
+                costSchedule(r)[i],
               0,
             ),
           bh = (v / max) * ch;
@@ -1066,10 +1064,6 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     XLSX.utils.book_append_sheet(wb, ws, name.replace(/\.xlsx$/, ""));
     XLSX.writeFile(wb, name);
   }
-  $("analysisMode").onchange = (e) => {
-    state.mode = e.target.value;
-    renderChart();
-  };
   document.querySelectorAll(".tab").forEach((tab) =>
     tab.addEventListener("click", () => {
       document
@@ -1197,14 +1191,16 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     exportRows("financial-trend.csv", [
       [
         "Month",
-        "Operational Cost TTD",
-        "Payment Cash Outflow TTD",
+        "Operational Requirement TTD",
+        "Debt Requirement TTD",
+        "Overall Requirement TTD",
         "Actual Revenue TTD",
         "Configured Pricing Revenue TTD",
         "Expected Revenue TTD",
         "Pricing Complete",
-        "Actual Operating Result TTD",
-        "Expected Operating Result TTD",
+        "Operating Profit or Loss TTD",
+        "Funding Surplus or Shortfall TTD",
+        "Overall Coverage Percent",
       ],
       ...state.months.map((m, i) => [
         mk(m),
@@ -1236,7 +1232,7 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
         const saved = await HRplusStorage.getDataset(item.id);
         if (!saved) continue;
         if (
-          saved.schemaVersion !== 1 ||
+          ![1, 2].includes(saved.schemaVersion) ||
           !Array.isArray(saved.records) ||
           !Array.isArray(saved.warnings)
         )
@@ -1279,7 +1275,6 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
   }
   async function initializeApplication() {
     state.initialized = false;
-    $("analysisMode").value = state.mode;
     $("actualToggle").setAttribute("aria-pressed", String(state.showActual));
     $("expectedToggle").setAttribute("aria-pressed", String(state.showExpected));
     $("startMonth").value = setting("hrplus-start-month", mk(new Date()));
@@ -1296,11 +1291,6 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     buildMonths();
     render();
   }
-  $("analysisMode").onchange = (e) => {
-    state.mode = e.target.value;
-    localStorage.setItem("hrplus-analysis-mode", JSON.stringify(state.mode));
-    renderChart();
-  };
   $("startMonth").onchange = (e) => {
     localStorage.setItem("hrplus-start-month", JSON.stringify(e.target.value));
     render();
@@ -1313,6 +1303,8 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     );
     renderChart();
   };
+  $("operationalToggle").onclick = () => { state.showOperational = !state.showOperational; localStorage.setItem("hrplus-show-operational", JSON.stringify(state.showOperational)); renderChart(); };
+  $("debtToggle").onclick = () => { state.showDebt = !state.showDebt; localStorage.setItem("hrplus-show-debt", JSON.stringify(state.showDebt)); renderChart(); };
   $("expectedToggle").onclick = () => {
     state.showExpected = !state.showExpected;
     localStorage.setItem(
@@ -1330,7 +1322,6 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       "hrplus-module-rates",
       "opcost-fx",
       "hrplus-start-month",
-      "hrplus-analysis-mode",
       "hrplus-show-actual",
       "hrplus-show-expected",
     ].forEach((k) => localStorage.removeItem(k));
@@ -1487,15 +1478,15 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     const reportingClients = (clientRecords || []).filter((client) =>
         clientContributesDuringPeriod(client, months),
       ),
-      costs = months.map((_, i) =>
+      operationalRequirement = months.map((_, i) =>
         (costRecords || []).reduce(
-          (sum, record) => sum + costSchedule(record)[i],
+          (sum, record) => sum + (record.recordType === "Debt" ? 0 : costSchedule(record)[i]),
           0,
         ),
       ),
-      payments = months.map((_, i) =>
+      debtRequirement = months.map((_, i) =>
         (costRecords || []).reduce(
-          (sum, record) => sum + paymentSchedule(record)[i],
+          (sum, record) => sum + (record.recordType === "Debt" ? costSchedule(record)[i] : 0),
           0,
         ),
       ),
@@ -1531,11 +1522,12 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
       expectedComplete = reportingClients.every(
         (client) => pricing(client).missingModules.length === 0,
       ),
-      groups = [],
-      groupValues = {};
+      groups = [...new Set((costRecords || []).map((record) => record[$("groupBy")?.value || "project"]))],
+      groupValues = Object.fromEntries(groups.map((group) => [group, months.map((_, i) => (costRecords || []).filter((record) => record[$("groupBy")?.value || "project"] === group).reduce((sum, record) => sum + costSchedule(record)[i], 0))]));
     return {
-      operationalCosts: costs,
-      paymentCashOutflows: payments,
+      operationalRequirement,
+      debtRequirement,
+      overallRequirement: operationalRequirement.map((value, index) => value + debtRequirement[index]),
       actualRevenue: actual,
       completeExpectedRevenue,
       configuredPricingRevenue,
@@ -1555,28 +1547,32 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     const reportingMonthCount = state.months.length;
     const reportingStart = state.months[0];
     const reportingEnd = state.months[state.months.length - 1];
-    const totalCost = series.operationalCosts.reduce((sum, value) => sum + value, 0);
+    const totalOperational = series.operationalRequirement.reduce((sum, value) => sum + value, 0);
+    const totalDebt = series.debtRequirement.reduce((sum, value) => sum + value, 0);
     const totalActual = series.actualRevenue.reduce((sum, value) => sum + value, 0);
-    const averageCost = totalCost / reportingMonthCount;
+    const averageCost = totalOperational / reportingMonthCount;
+    const averageDebt = totalDebt / reportingMonthCount;
+    const averageOverall = averageCost + averageDebt;
     const averageActual = totalActual / reportingMonthCount;
-    const result = averageActual - averageCost;
+    const operatingResult = averageActual - averageCost;
+    const fundingResult = averageActual - (averageCost + totalDebt / reportingMonthCount);
     const period = `${ml(reportingStart)} – ${ml(reportingEnd)} · ${reportingMonthCount} months`;
     $("avgMonth").textContent = `TTD ${money2.format(averageCost)}`;
     $("avgMonthLabel").textContent = "Average Monthly Operational Cost";
     $("avgMonthNote").textContent = period;
+    $("averageDebt").textContent = `TTD ${money2.format(averageDebt)}`;
+    $("averageDebtNote").textContent = period;
+    $("averageOverall").textContent = `TTD ${money2.format(averageOverall)}`;
+    $("averageOverallNote").textContent = period;
     $("actualRevenue").textContent = `TTD ${money2.format(averageActual)}`;
     $("actualRevenueLabel").textContent = "Average Monthly Actual Revenue";
     $("actualRevenueNote").textContent = `${period} · Coverage ${averageCost ? ((averageActual / averageCost) * 100).toFixed(1) : "0.0"}%`;
-    $("actualResult").textContent = result > 0 ? `TTD ${money2.format(result)}` : result < 0 ? `TTD ${money2.format(Math.abs(result))}` : "Break-even";
-    $("actualResultLabel").textContent = result > 0 ? "Average Monthly Profit" : result < 0 ? "Average Monthly Loss" : "Average Monthly Result";
-    $("actualResultNote").textContent = period;
-    $("expectedRevenue").textContent = series.expectedComplete
-      ? `TTD ${money2.format(series.completeExpectedRevenue.reduce((sum, value) => sum + value, 0) / reportingMonthCount)}`
-      : "Incomplete";
-    $("expectedRevenueLabel").textContent = series.expectedComplete ? "Average Monthly Expected Revenue" : "Pricing Target";
-    $("expectedRevenueNote").textContent = series.expectedComplete
-      ? "All active modules configured"
-      : `${series.configuredModuleCount} of ${series.requiredModuleCount} modules configured`;
+    $("operatingResult").textContent = operatingResult > 0 ? `TTD ${money2.format(operatingResult)}` : operatingResult < 0 ? `TTD ${money2.format(Math.abs(operatingResult))}` : "Break-even";
+    $("operatingResultLabel").textContent = operatingResult > 0 ? "Average Monthly Operating Profit" : operatingResult < 0 ? "Average Monthly Operating Loss" : "Average Monthly Operating Result";
+    $("operatingResultNote").textContent = period;
+    $("fundingResult").textContent = fundingResult > 0 ? `TTD ${money2.format(fundingResult)}` : fundingResult < 0 ? `TTD ${money2.format(Math.abs(fundingResult))}` : "Break-even";
+    $("fundingResultLabel").textContent = fundingResult > 0 ? "Average Monthly Funding Surplus" : fundingResult < 0 ? "Average Monthly Funding Shortfall" : "Average Monthly Funding Result";
+    $("fundingResultNote").textContent = `${period} · Coverage ${averageOverall ? (averageActual / averageOverall * 100).toFixed(1) : "0.0"}%`;
     $("pricingWarning").textContent = series.expectedComplete
       ? ""
       : `Expected revenue is incomplete. Missing: ${series.missingModules.join(", ") || "none"}.`;
@@ -1718,11 +1714,17 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
             : state.clientRecords,
           state.months,
         ),
+      getVisibleSeries: (series) => [
+        ...(state.showOperational ? [series.operationalRequirement] : []),
+        ...(state.showDebt ? [series.overallRequirement] : []),
+        ...(state.showActual ? [series.actualRevenue] : []),
+        ...(state.showExpected ? [series.expectedComplete ? series.completeExpectedRevenue : series.configuredPricingRevenue] : []),
+      ],
       getScale: (series) =>
         Math.max(
           1,
-          ...series.operationalCosts,
-          ...series.paymentCashOutflows,
+          ...(state.showOperational ? series.operationalRequirement : []),
+          ...(state.showDebt ? series.overallRequirement : []),
           ...(state.showActual ? series.actualRevenue : []),
           ...(state.showExpected
             ? series.expectedComplete
@@ -1745,27 +1747,30 @@ CL003,Island Services Ltd,V6,Workforce|Leave,300,TTD,18000,2026-06-01,,Planned,P
     exportRows("financial-trend.csv", [
       [
         "Month",
-        "Operational Cost TTD",
-        "Payment Cash Outflow TTD",
+        "Operational Requirement TTD",
+        "Debt Requirement TTD",
+        "Overall Requirement TTD",
         "Actual Revenue TTD",
         "Configured Pricing Revenue TTD",
         "Expected Revenue TTD",
+        "Operating Profit or Loss TTD",
+        "Funding Surplus or Shortfall TTD",
+        "Overall Coverage Percent",
         "Pricing Complete",
-        "Actual Operating Result TTD",
-        "Expected Operating Result TTD",
       ],
       ...state.months.map((month, i) => [
         mk(month),
-        series.operationalCosts[i],
-        series.paymentCashOutflows[i],
+        series.operationalRequirement[i],
+        series.debtRequirement[i],
+        series.overallRequirement[i],
         series.actualRevenue[i],
         series.configuredPricingRevenue[i],
         series.expectedComplete ? series.completeExpectedRevenue[i] : "",
         series.expectedComplete ? "Yes" : "No",
-        series.actualRevenue[i] - series.operationalCosts[i],
-        series.expectedComplete
-          ? series.completeExpectedRevenue[i] - series.operationalCosts[i]
-          : "",
+        series.actualRevenue[i] - series.operationalRequirement[i],
+        series.actualRevenue[i] - series.overallRequirement[i],
+        series.overallRequirement[i] ? series.actualRevenue[i] / series.overallRequirement[i] * 100 : "",
+        series.expectedComplete ? "Yes" : "No",
       ]),
     ]);
   };
